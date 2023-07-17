@@ -40,6 +40,14 @@ fn conf() -> Conf {
     }
 }
 
+fn draw_resistor_body() {
+    draw_circle(190.0, 88.0, 40.0, BEIGE);
+    draw_circle(390.0, 88.0, 40.0, BEIGE);
+    draw_rectangle(200.0, 53.0, 200.0, 69.0, BEIGE);
+    draw_rectangle(70.0, 80.0, 80.0, 15.0, GRAY);
+    draw_rectangle(430.0, 80.0, 80.0, 15.0, GRAY);
+}
+
 #[macroquad::main(conf)]
 async fn main() {
     let mut panel: Panel = Panel::FiveBand;
@@ -58,14 +66,10 @@ async fn main() {
     let mut selected_tolerance: String = "±1% (F)".to_string();
     let mut selected_temp_coefficient: String = "100 ppm/ºC".to_string();
     let mut string_result: String = String::new();
-
     let mut multiplier_pos_x: f32;
     let mut tolerance_pos_x: f32;
-    
     let mut int_result: f64 = 0.0;
 
-    let resistor_texture: Texture2D = load_texture("assets/resbody.png").await.unwrap();
-    
     loop {
         clear_background(BLACK);
         
@@ -412,46 +416,45 @@ async fn main() {
         egui_macroquad::draw();
 
         if panel != Panel::About {
-
-            draw_texture(resistor_texture, 100.0, 50.0, WHITE);
+            draw_resistor_body();
             
             match selected_first.as_str() {
-                "1" => {draw_rectangle(190.0, 51.0, 10.0, 75.0, BROWN)}
-                "2" => {draw_rectangle(190.0, 51.0, 10.0, 75.0, RED)}
-                "3" => {draw_rectangle(190.0, 51.0, 10.0, 75.0, ORANGE)}
-                "4" => {draw_rectangle(190.0, 51.0, 10.0, 75.0, YELLOW)}
-                "5" => {draw_rectangle(190.0, 51.0, 10.0, 75.0, GREEN)}
-                "6" => {draw_rectangle(190.0, 51.0, 10.0, 75.0, BLUE)}
-                "7" => {draw_rectangle(190.0, 51.0, 10.0, 75.0, VIOLET)}
-                "8" => {draw_rectangle(190.0, 51.0, 10.0, 75.0, GRAY)}
-                _ => {draw_rectangle(190.0, 51.0, 10.0, 75.0, WHITE)}
+                "1" => {draw_rectangle(187.0, 48.0, 6.0, 80.0, DARKBROWN)}
+                "2" => {draw_rectangle(187.0, 48.0, 6.0, 80.0, RED)}
+                "3" => {draw_rectangle(187.0, 48.0, 6.0, 80.0, ORANGE)}
+                "4" => {draw_rectangle(187.0, 48.0, 6.0, 80.0, YELLOW)}
+                "5" => {draw_rectangle(187.0, 48.0, 6.0, 80.0, GREEN)}
+                "6" => {draw_rectangle(187.0, 48.0, 6.0, 80.0, BLUE)}
+                "7" => {draw_rectangle(187.0, 48.0, 6.0, 80.0, VIOLET)}
+                "8" => {draw_rectangle(187.0, 48.0, 6.0, 80.0, GRAY)}
+                _ => {draw_rectangle(187.0, 48.0, 6.0, 80.0, WHITE)}
             }
 
             match selected_second.as_str() {
-                "0" => {draw_rectangle(220.0, 56.0, 10.0, 65.0, BLACK)}
-                "1" => {draw_rectangle(220.0, 56.0, 10.0, 65.0, BROWN)}
-                "2" => {draw_rectangle(220.0, 56.0, 10.0, 65.0, RED)}
-                "3" => {draw_rectangle(220.0, 56.0, 10.0, 65.0, ORANGE)}
-                "4" => {draw_rectangle(220.0, 56.0, 10.0, 65.0, YELLOW)}
-                "5" => {draw_rectangle(220.0, 56.0, 10.0, 65.0, GREEN)}
-                "6" => {draw_rectangle(220.0, 56.0, 10.0, 65.0, BLUE)}
-                "7" => {draw_rectangle(220.0, 56.0, 10.0, 65.0, VIOLET)}
-                "8" => {draw_rectangle(220.0, 56.0, 10.0, 65.0, GRAY)}
-                _ => {draw_rectangle(220.0, 56.0, 10.0, 65.0, WHITE)}
+                "0" => {draw_rectangle(220.0, 53.0, 6.0, 69.0, BLACK)}
+                "1" => {draw_rectangle(220.0, 53.0, 6.0, 69.0, DARKBROWN)}
+                "2" => {draw_rectangle(220.0, 53.0, 6.0, 69.0, RED)}
+                "3" => {draw_rectangle(220.0, 53.0, 6.0, 69.0, ORANGE)}
+                "4" => {draw_rectangle(220.0, 53.0, 6.0, 69.0, YELLOW)}
+                "5" => {draw_rectangle(220.0, 53.0, 6.0, 69.0, GREEN)}
+                "6" => {draw_rectangle(220.0, 53.0, 6.0, 69.0, BLUE)}
+                "7" => {draw_rectangle(220.0, 53.0, 6.0, 69.0, VIOLET)}
+                "8" => {draw_rectangle(220.0, 53.0, 6.0, 69.0, GRAY)}
+                _ => {draw_rectangle(220.0, 53.0, 6.0, 69.0, WHITE)}
             }
 
             if panel == Panel::FiveBand || panel == Panel::SixBand {
                 match selected_third.as_str() {
-                    "0" => {draw_rectangle(250.0, 56.0, 10.0, 65.0, BLACK)}
-                    "1" => {draw_rectangle(250.0, 56.0, 10.0, 65.0, BROWN)}
-                    "2" => {draw_rectangle(250.0, 56.0, 10.0, 65.0, RED)}
-                    "3" => {draw_rectangle(250.0, 56.0, 10.0, 65.0, ORANGE)}
-                    "4" => {draw_rectangle(250.0, 56.0, 10.0, 65.0, YELLOW)}
-                    "5" => {draw_rectangle(250.0, 56.0, 10.0, 65.0, GREEN)}
-                    "6" => {draw_rectangle(250.0, 56.0, 10.0, 65.0, BLUE)}
-                    "7" => {draw_rectangle(250.0, 56.0, 10.0, 65.0, VIOLET)}
-                    "8" => {draw_rectangle(250.0, 56.0, 10.0, 65.0, GRAY)}
-                    "9" => {draw_rectangle(250.0, 56.0, 10.0, 65.0, WHITE)}
+                    "0" => {draw_rectangle(250.0, 53.0, 6.0, 69.0, BLACK)}
+                    "1" => {draw_rectangle(250.0, 53.0, 6.0, 69.0, DARKBROWN)}
+                    "2" => {draw_rectangle(250.0, 53.0, 6.0, 69.0, RED)}
+                    "3" => {draw_rectangle(250.0, 53.0, 6.0, 69.0, ORANGE)}
+                    "4" => {draw_rectangle(250.0, 53.0, 6.0, 69.0, YELLOW)}
+                    "5" => {draw_rectangle(250.0, 53.0, 6.0, 69.0, GREEN)}
+                    "6" => {draw_rectangle(250.0, 53.0, 6.0, 69.0, BLUE)}
+                    "7" => {draw_rectangle(250.0, 53.0, 6.0, 69.0, VIOLET)}
+                    "8" => {draw_rectangle(250.0, 53.0, 6.0, 69.0, GRAY)}
+                    "9" => {draw_rectangle(250.0, 53.0, 6.0, 69.0, WHITE)}
                     _ => {}
                 }
                 multiplier_pos_x = 280.0;
@@ -462,49 +465,49 @@ async fn main() {
             }
 
             match multiplier {
-                BandColor::Black => {draw_rectangle(multiplier_pos_x, 56.0, 10.0, 65.0, BLACK)},
-                BandColor::Brown => {draw_rectangle(multiplier_pos_x, 56.0, 10.0, 65.0, BROWN)}
-                BandColor::Red => {draw_rectangle(multiplier_pos_x, 56.0, 10.0, 65.0, RED)}
-                BandColor::Orange => {draw_rectangle(multiplier_pos_x, 56.0, 10.0, 65.0, ORANGE)}
-                BandColor::Yellow => {draw_rectangle(multiplier_pos_x, 56.0, 10.0, 65.0, YELLOW)}
-                BandColor::Green => {draw_rectangle(multiplier_pos_x, 56.0, 10.0, 65.0, GREEN)}
-                BandColor::Blue => {draw_rectangle(multiplier_pos_x, 56.0, 10.0, 65.0, BLUE)}
-                BandColor::Violet => {draw_rectangle(multiplier_pos_x, 56.0, 10.0, 65.0, VIOLET)}
-                BandColor::Gray => {draw_rectangle(multiplier_pos_x, 56.0, 10.0, 65.0, GRAY)}
-                BandColor::White => {draw_rectangle(multiplier_pos_x, 56.0, 10.0, 65.0, WHITE)}
-                BandColor::Gold => {draw_rectangle(multiplier_pos_x, 56.0, 10.0, 65.0, GOLD)}
-                BandColor::Silver => {draw_rectangle(multiplier_pos_x, 56.0, 10.0, 65.0, LIGHTGRAY)}
+                BandColor::Black => {draw_rectangle(multiplier_pos_x, 53.0, 6.0, 69.0, BLACK)},
+                BandColor::Brown => {draw_rectangle(multiplier_pos_x, 53.0, 6.0, 69.0, DARKBROWN)}
+                BandColor::Red => {draw_rectangle(multiplier_pos_x, 53.0, 6.0, 69.0, RED)}
+                BandColor::Orange => {draw_rectangle(multiplier_pos_x, 53.0, 6.0, 69.0, ORANGE)}
+                BandColor::Yellow => {draw_rectangle(multiplier_pos_x, 53.0, 6.0, 69.0, YELLOW)}
+                BandColor::Green => {draw_rectangle(multiplier_pos_x, 53.0, 6.0, 69.0, GREEN)}
+                BandColor::Blue => {draw_rectangle(multiplier_pos_x, 53.0, 6.0, 69.0, BLUE)}
+                BandColor::Violet => {draw_rectangle(multiplier_pos_x, 53.0, 6.0, 69.0, VIOLET)}
+                BandColor::Gray => {draw_rectangle(multiplier_pos_x, 53.0, 6.0, 69.0, GRAY)}
+                BandColor::White => {draw_rectangle(multiplier_pos_x, 53.0, 6.0, 69.0, WHITE)}
+                BandColor::Gold => {draw_rectangle(multiplier_pos_x, 53.0, 6.0, 69.0, GOLD)}
+                BandColor::Silver => {draw_rectangle(multiplier_pos_x, 53.0, 6.0, 69.0, LIGHTGRAY)}
             }
 
             match tolerance {
-                BandColor::Black => {draw_rectangle(tolerance_pos_x, 56.0, 10.0, 65.0, BLACK)},
-                BandColor::Brown => {draw_rectangle(tolerance_pos_x, 56.0, 10.0, 65.0, BROWN)}
-                BandColor::Red => {draw_rectangle(tolerance_pos_x, 56.0, 10.0, 65.0, RED)}
-                BandColor::Orange => {draw_rectangle(tolerance_pos_x, 56.0, 10.0, 65.0, ORANGE)}
-                BandColor::Yellow => {draw_rectangle(tolerance_pos_x, 56.0, 10.0, 65.0, YELLOW)}
-                BandColor::Green => {draw_rectangle(tolerance_pos_x, 56.0, 10.0, 65.0, GREEN)}
-                BandColor::Blue => {draw_rectangle(tolerance_pos_x, 56.0, 10.0, 65.0, BLUE)}
-                BandColor::Violet => {draw_rectangle(tolerance_pos_x, 56.0, 10.0, 65.0, VIOLET)}
-                BandColor::Gray => {draw_rectangle(tolerance_pos_x, 56.0, 10.0, 65.0, GRAY)}
-                BandColor::White => {draw_rectangle(tolerance_pos_x, 56.0, 10.0, 65.0, WHITE)}
-                BandColor::Gold => {draw_rectangle(tolerance_pos_x, 56.0, 10.0, 65.0, GOLD)}
-                BandColor::Silver => {draw_rectangle(tolerance_pos_x, 56.0, 10.0, 65.0, LIGHTGRAY)}
+                BandColor::Black => {draw_rectangle(tolerance_pos_x, 53.0, 6.0, 69.0, BLACK)},
+                BandColor::Brown => {draw_rectangle(tolerance_pos_x, 53.0, 6.0, 69.0, DARKBROWN)}
+                BandColor::Red => {draw_rectangle(tolerance_pos_x, 53.0, 6.0, 69.0, RED)}
+                BandColor::Orange => {draw_rectangle(tolerance_pos_x, 53.0, 6.0, 69.0, ORANGE)}
+                BandColor::Yellow => {draw_rectangle(tolerance_pos_x, 53.0, 6.0, 69.0, YELLOW)}
+                BandColor::Green => {draw_rectangle(tolerance_pos_x, 53.0, 6.0, 69.0, GREEN)}
+                BandColor::Blue => {draw_rectangle(tolerance_pos_x, 53.0, 6.0, 69.0, BLUE)}
+                BandColor::Violet => {draw_rectangle(tolerance_pos_x, 53.0, 6.0, 69.0, VIOLET)}
+                BandColor::Gray => {draw_rectangle(tolerance_pos_x, 53.0, 6.0, 69.0, GRAY)}
+                BandColor::White => {draw_rectangle(tolerance_pos_x, 53.0, 6.0, 69.0, WHITE)}
+                BandColor::Gold => {draw_rectangle(tolerance_pos_x, 53.0, 6.0, 69.0, GOLD)}
+                BandColor::Silver => {draw_rectangle(tolerance_pos_x, 53.0, 6.0, 69.0, LIGHTGRAY)}
             }
 
             if panel == Panel::SixBand {
                 match temp_coefficient {
-                    BandColor::Black => {draw_rectangle(400.0, 51.0, 10.0, 75.0, BLACK)},
-                    BandColor::Brown => {draw_rectangle(400.0, 51.0, 10.0, 75.0, BROWN)}
-                    BandColor::Red => {draw_rectangle(400.0, 51.0, 10.0, 75.0, RED)}
-                    BandColor::Orange => {draw_rectangle(400.0, 51.0, 10.0, 75.0, ORANGE)}
-                    BandColor::Yellow => {draw_rectangle(400.0, 51.0, 10.0, 75.0, YELLOW)}
-                    BandColor::Green => {draw_rectangle(400.0, 51.0, 10.0, 75.0, GREEN)}
-                    BandColor::Blue => {draw_rectangle(400.0, 51.0, 10.0, 75.0, BLUE)}
-                    BandColor::Violet => {draw_rectangle(400.0, 51.0, 10.0, 75.0, VIOLET)}
-                    BandColor::Gray => {draw_rectangle(400.0, 51.0, 10.0, 75.0, GRAY)}
-                    BandColor::White => {draw_rectangle(400.0, 51.0, 10.0, 75.0, WHITE)}
-                    BandColor::Gold => {draw_rectangle(400.0, 51.0, 10.0, 75.0, GOLD)}
-                    BandColor::Silver => {draw_rectangle(400.0, 51.0, 10.0, 75.0, LIGHTGRAY)}
+                    BandColor::Black => {draw_rectangle(387.0, 48.0, 6.0, 80.0, BLACK)},
+                    BandColor::Brown => {draw_rectangle(387.0, 48.0, 6.0, 80.0, DARKBROWN)}
+                    BandColor::Red => {draw_rectangle(387.0, 48.0, 6.0, 80.0, RED)}
+                    BandColor::Orange => {draw_rectangle(387.0, 48.0, 6.0, 80.0, ORANGE)}
+                    BandColor::Yellow => {draw_rectangle(387.0, 48.0, 6.0, 80.0, YELLOW)}
+                    BandColor::Green => {draw_rectangle(387.0, 48.0, 6.0, 80.0, GREEN)}
+                    BandColor::Blue => {draw_rectangle(387.0, 48.0, 6.0, 80.0, BLUE)}
+                    BandColor::Violet => {draw_rectangle(387.0, 48.0, 6.0, 80.0, VIOLET)}
+                    BandColor::Gray => {draw_rectangle(387.0, 48.0, 6.0, 80.0, GRAY)}
+                    BandColor::White => {draw_rectangle(387.0, 48.0, 6.0, 80.0, WHITE)}
+                    BandColor::Gold => {draw_rectangle(387.0, 48.0, 6.0, 80.0, GOLD)}
+                    BandColor::Silver => {draw_rectangle(387.0, 48.0, 6.0, 80.0, LIGHTGRAY)}
                 }
             }
         }
