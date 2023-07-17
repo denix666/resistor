@@ -370,29 +370,20 @@ async fn main() {
 
                     int_result = string_result.parse::<f64>().unwrap() * selected_multiplier as f64;
 
-                    if int_result >= 100000000.0 {
+                    if int_result >= 1000000000.0 {
                         int_result = int_result / 1000000000.0;
                         string_multiplier = "GΩ".to_string();
-                    } else if int_result >= 10000000.0 {
-                        int_result = int_result / 1000000.0;
-                        string_multiplier = "MΩ".to_string();
                     } else if int_result >= 1000000.0 {
                         int_result = int_result / 1000000.0;
                         string_multiplier = "MΩ".to_string();
-                    } else if int_result >= 100000.0 {
-                        int_result = int_result / 1000.0;
-                        string_multiplier = "kΩ".to_string();
-                    } else if int_result >= 10000.0 {
-                        int_result = int_result / 1000.0;
-                        string_multiplier = "kΩ".to_string();
                     } else if int_result >= 1000.0 {
                         int_result = int_result / 1000.0;
                         string_multiplier = "kΩ".to_string();
-                    } else if int_result >= 100.0 {
+                    } else if int_result >= 1.0 {
+                        int_result = int_result / 1.0;
                         string_multiplier = "Ω".to_string();
                     }
 
-                
                     ui.centered_and_justified(|ui| {
                         if panel == Panel::SixBand {
                             ui.label(egui::RichText::new(format!("{} {} {} {}", int_result.to_string(), string_multiplier, selected_tolerance, selected_temp_coefficient)).font(egui::FontId::proportional(40.0)).color(egui::Color32::WHITE));
