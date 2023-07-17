@@ -10,9 +10,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Prep
-      run: sudo apt-get install libasound-dev -y
-      
     - uses: actions/checkout@v3
     - name: Build
       run: cargo build --release
@@ -21,7 +18,7 @@ jobs:
       run: |
         mv target/release/resistor resistor
         chmod 777 resistor
-        tar cpfz resistor_linux_x86_64.tar.gz resistor assets
+        tar cpfz resistor_linux_x86_64.tar.gz resistor
         
     - name: Release
       uses: softprops/action-gh-release@v1
@@ -46,7 +43,7 @@ jobs:
     - shell: bash
       run: |
         mv target/release/resistor resistor
-        7z a resistor_windows_x86_64.zip resistor.exe assets
+        7z a resistor_windows_x86_64.zip resistor.exe
         
     - name: Release
       uses: softprops/action-gh-release@v1
