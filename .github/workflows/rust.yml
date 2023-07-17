@@ -10,6 +10,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+    - name: Prep
+      run: sudo apt-get install libasound-dev -y
+      
     - uses: actions/checkout@v3
     - name: Build
       run: cargo build --release
