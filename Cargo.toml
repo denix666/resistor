@@ -12,5 +12,6 @@ license-file = "LICENSE"
 [dependencies]
 eframe = "0.36"
 serde = { version = "1", features = ["derive"] }
+image = { version = "0.25", default-features = false, features = ["png"] }
 serde_json = "1"
 dirs = "6"

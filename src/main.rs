@@ -5,6 +5,8 @@ use egui::{Color32, CornerRadius, Pos2, Rect, Vec2};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
+const ICON_BYTES: &[u8] = include_bytes!("../assets/icon.png");
+
 // ---------------------------------------------------------------------------
 // BandColor
 // ---------------------------------------------------------------------------
@@ -789,6 +791,13 @@ impl Drop for ResistorApp {
 // main
 // ---------------------------------------------------------------------------
 
+pub fn load_embedded_icon() -> Result<crate::egui::IconData, String> {
+    let img = image::load_from_memory(ICON_BYTES).map_err(|e| e.to_string())?.into_rgba8();
+    let (width, height) = img.dimensions();
+    let rgba = img.into_raw();
+    Ok(crate::egui::IconData { rgba, width, height })
+}
+
 fn main() -> eframe::Result<()> {
     let config = Config::load();
 
@@ -801,10 +810,14 @@ fn main() -> eframe::Result<()> {
         viewport = viewport.with_position([x, y]);
     }
 
-    let options = eframe::NativeOptions {
+    let mut options = eframe::NativeOptions {
         viewport,
         ..Default::default()
     };
+
+    if let Ok(icon) = load_embedded_icon() {
+        options.viewport = options.viewport.with_icon(icon);
+    }
 
     eframe::run_native(
         "Resistor",
