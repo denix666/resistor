@@ -1,17 +1,15 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use egui_macroquad::*;
-use macroquad::prelude::*;
+use eframe::egui;
+use egui::{Color32, CornerRadius, Pos2, Rect, Vec2};
+use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 
-#[derive(PartialEq, Eq)]
-enum Panel {
-    FourBand,
-    FiveBand,
-    SixBand,
-    About,
-}
+// ---------------------------------------------------------------------------
+// BandColor
+// ---------------------------------------------------------------------------
 
-#[derive(PartialEq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize)]
 enum BandColor {
     Black,
     Brown,
@@ -27,484 +25,614 @@ enum BandColor {
     Silver,
 }
 
-fn conf() -> Conf {
-    let mut title = String::from("Resistor v");
-    title.push_str(env!("CARGO_PKG_VERSION"));
-    Conf {
-        window_title: title
-        .to_owned(),
-        fullscreen: false,
-        sample_count: 16,
-        window_width: 600,
-        window_height: 400,
-        window_resizable: false,
-        ..Default::default()
+impl BandColor {
+    fn digit(self) -> u8 {
+        match self {
+            Self::Black => 0,
+            Self::Brown => 1,
+            Self::Red => 2,
+            Self::Orange => 3,
+            Self::Yellow => 4,
+            Self::Green => 5,
+            Self::Blue => 6,
+            Self::Violet => 7,
+            Self::Gray => 8,
+            Self::White => 9,
+            Self::Gold | Self::Silver => 0,
+        }
+    }
+
+    fn multiplier(self) -> f64 {
+        match self {
+            Self::Black => 1.0,
+            Self::Brown => 10.0,
+            Self::Red => 100.0,
+            Self::Orange => 1_000.0,
+            Self::Yellow => 10_000.0,
+            Self::Green => 100_000.0,
+            Self::Blue => 1_000_000.0,
+            Self::Violet => 10_000_000.0,
+            Self::Gray => 100_000_000.0,
+            Self::White => 1_000_000_000.0,
+            Self::Gold => 0.1,
+            Self::Silver => 0.01,
+        }
+    }
+
+    fn tolerance(self) -> &'static str {
+        match self {
+            Self::Brown => "±1% (F)",
+            Self::Red => "±2% (G)",
+            Self::Orange => "±0.05% (W)",
+            Self::Yellow => "±0.02% (P)",
+            Self::Green => "±0.5% (D)",
+            Self::Blue => "±0.25% (C)",
+            Self::Violet => "±0.1% (B)",
+            Self::Gray => "±0.01% (L)",
+            Self::Gold => "±5% (J)",
+            Self::Silver => "±10% (K)",
+            _ => "",
+        }
+    }
+
+    fn temp_coefficient(self) -> &'static str {
+        match self {
+            Self::Brown => "100 ppm/ºC",
+            Self::Red => "50 ppm/ºC",
+            Self::Orange => "15 ppm/ºC",
+            Self::Yellow => "25 ppm/ºC",
+            Self::Blue => "10 ppm/ºC",
+            Self::Violet => "5 ppm/ºC",
+            Self::White => "1 ppm/ºC",
+            _ => "",
+        }
+    }
+
+    fn color32(self) -> Color32 {
+        match self {
+            Self::Black => Color32::from_rgb(10, 10, 10),
+            Self::Brown => Color32::from_rgb(139, 69, 19),
+            Self::Red => Color32::from_rgb(220, 20, 20),
+            Self::Orange => Color32::from_rgb(255, 140, 0),
+            Self::Yellow => Color32::from_rgb(255, 255, 0),
+            Self::Green => Color32::from_rgb(0, 160, 0),
+            Self::Blue => Color32::from_rgb(0, 0, 220),
+            Self::Violet => Color32::from_rgb(148, 0, 211),
+            Self::Gray => Color32::from_rgb(128, 128, 128),
+            Self::White => Color32::from_rgb(255, 255, 255),
+            Self::Gold => Color32::from_rgb(218, 165, 32),
+            Self::Silver => Color32::from_rgb(192, 192, 192),
+        }
+    }
+
+    const FIRST_DIGIT: &[Self] = &[
+        Self::Brown,
+        Self::Red,
+        Self::Orange,
+        Self::Yellow,
+        Self::Green,
+        Self::Blue,
+        Self::Violet,
+        Self::Gray,
+        Self::White,
+    ];
+
+    const DIGIT: &[Self] = &[
+        Self::Black,
+        Self::Brown,
+        Self::Red,
+        Self::Orange,
+        Self::Yellow,
+        Self::Green,
+        Self::Blue,
+        Self::Violet,
+        Self::Gray,
+        Self::White,
+    ];
+
+    const MULTIPLIER: &[Self] = &[
+        Self::Black,
+        Self::Brown,
+        Self::Red,
+        Self::Orange,
+        Self::Yellow,
+        Self::Green,
+        Self::Blue,
+        Self::Violet,
+        Self::Gray,
+        Self::White,
+        Self::Gold,
+        Self::Silver,
+    ];
+
+    const TOLERANCE: &[Self] = &[
+        Self::Brown,
+        Self::Red,
+        Self::Orange,
+        Self::Yellow,
+        Self::Green,
+        Self::Blue,
+        Self::Violet,
+        Self::Gray,
+        Self::Gold,
+        Self::Silver,
+    ];
+
+    const TEMP_COEFFICIENT: &[Self] = &[
+        Self::Brown,
+        Self::Red,
+        Self::Orange,
+        Self::Yellow,
+        Self::Blue,
+        Self::Violet,
+        Self::White,
+    ];
+}
+
+impl std::fmt::Display for BandColor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Debug::fmt(self, f)
     }
 }
 
-fn draw_resistor_body() {
-    draw_circle(190.0, 88.0, 40.0, BEIGE);
-    draw_circle(390.0, 88.0, 40.0, BEIGE);
-    draw_rectangle(200.0, 53.0, 200.0, 69.0, BEIGE);
-    draw_rectangle(70.0, 80.0, 80.0, 15.0, GRAY);
-    draw_rectangle(430.0, 80.0, 80.0, 15.0, GRAY);
+// ---------------------------------------------------------------------------
+// Panel
+// ---------------------------------------------------------------------------
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize)]
+enum Panel {
+    FourBand,
+    FiveBand,
+    SixBand,
+    About,
 }
 
-#[macroquad::main(conf)]
-async fn main() {
-    let mut panel: Panel = Panel::FiveBand;
-    let mut first_band: BandColor = BandColor::Brown;
-    let mut second_band: BandColor = BandColor::Black;
-    let mut third_band: BandColor = BandColor::Black;
-    let mut multiplier: BandColor = BandColor::Black;
-    let mut tolerance: BandColor = BandColor::Brown;
-    let mut temp_coefficient: BandColor = BandColor::Brown;
-    
-    let mut selected_first: String = "1".to_string();
-    let mut selected_second: String = "0".to_string();
-    let mut selected_third: String = "0".to_string();
-    let mut selected_multiplier: i64 = 1;
-    let mut string_multiplier: String = "Ω".to_string();
-    let mut selected_tolerance: String = "±1% (F)".to_string();
-    let mut selected_temp_coefficient: String = "100 ppm/ºC".to_string();
-    let mut string_result: String = String::new();
-    let mut multiplier_pos_x: f32;
-    let mut tolerance_pos_x: f32;
-    let mut int_result: f64 = 0.0;
+// ---------------------------------------------------------------------------
+// Config (persisted to JSON)
+// ---------------------------------------------------------------------------
 
-    loop {
-        clear_background(BLACK);
-        
-        egui_macroquad::ui(|ctx| {
-            egui::CentralPanel::default().show(&ctx, |ui| {
-                ui.horizontal(|ui| {
-                    ui.selectable_value(&mut panel, Panel::FourBand, "4-Bands");
-                    ui.selectable_value(&mut panel, Panel::FiveBand, "5-Bands");
-                    ui.selectable_value(&mut panel, Panel::SixBand, "6-Bands");
-                    ui.selectable_value(&mut panel, Panel::About, "About...");
-                });
-                
-                if panel != Panel::About {
-                    ui.add_space(120.0);
-                    ui.separator();
+#[derive(Serialize, Deserialize)]
+struct Config {
+    #[serde(default)]
+    window_pos: Option<[f32; 2]>,
+    #[serde(default = "default_panel")]
+    panel: Panel,
+    #[serde(default = "default_first")]
+    first_band: BandColor,
+    #[serde(default = "default_zero")]
+    second_band: BandColor,
+    #[serde(default = "default_zero")]
+    third_band: BandColor,
+    #[serde(default = "default_zero")]
+    multiplier: BandColor,
+    #[serde(default = "default_tolerance")]
+    tolerance: BandColor,
+    #[serde(default = "default_tolerance")]
+    temp_coefficient: BandColor,
+}
 
-                    ui.horizontal(|ui| {
-                        ui.vertical(|ui| {
-                            ui.label("First ring");
-                            egui::ComboBox::from_id_source("1").selected_text(format!("{:?}", first_band)).width(90.0).show_ui(ui, |ui| {
-                                if ui.selectable_value(&mut first_band, BandColor::Brown, "Brown").clicked() {
-                                    first_band = BandColor::Brown;
-                                    selected_first = "1".to_string();
-                                }
-                                if ui.selectable_value(&mut first_band, BandColor::Red, "Red").clicked() {
-                                    first_band = BandColor::Red;
-                                    selected_first = "2".to_string();
-                                }
-                                if ui.selectable_value(&mut first_band, BandColor::Orange, "Orange").clicked() {
-                                    first_band = BandColor::Orange;
-                                    selected_first = "3".to_string();
-                                }
-                                if ui.selectable_value(&mut first_band, BandColor::Yellow, "Yellow").clicked() {
-                                    first_band = BandColor::Yellow;
-                                    selected_first = "4".to_string();
-                                }
-                                if ui.selectable_value(&mut first_band, BandColor::Green, "Green").clicked() {
-                                    first_band = BandColor::Green;
-                                    selected_first = "5".to_string();
-                                }
-                                if ui.selectable_value(&mut first_band, BandColor::Blue, "Blue").clicked() {
-                                    first_band = BandColor::Blue;
-                                    selected_first = "6".to_string();
-                                }
-                                if ui.selectable_value(&mut first_band, BandColor::Violet, "Violet").clicked() {
-                                    first_band = BandColor::Violet;
-                                    selected_first = "7".to_string();
-                                }
-                                if ui.selectable_value(&mut first_band, BandColor::Gray, "Gray").clicked() {
-                                    first_band = BandColor::Gray;
-                                    selected_first = "8".to_string();
-                                }
-                                if ui.selectable_value(&mut first_band, BandColor::White, "White").clicked() {
-                                    first_band = BandColor::White;
-                                    selected_first = "9".to_string();
-                                }
-                            });
-                        });
-                        ui.vertical(|ui| {
-                            ui.label("Second ring");
-                            egui::ComboBox::from_id_source("2").selected_text(format!("{:?}", second_band)).width(90.0).show_ui(ui, |ui| {
-                                if ui.selectable_value(&mut second_band, BandColor::Black, "Black").clicked() {
-                                    second_band = BandColor::Black;
-                                    selected_second = "0".to_string();
-                                }
-                                if ui.selectable_value(&mut second_band, BandColor::Brown, "Brown").clicked() {
-                                    second_band = BandColor::Brown;
-                                    selected_second = "1".to_string();
-                                }
-                                if ui.selectable_value(&mut second_band, BandColor::Red, "Red").clicked() {
-                                    second_band = BandColor::Red;
-                                    selected_second = "2".to_string();
-                                }
-                                if ui.selectable_value(&mut second_band, BandColor::Orange, "Orange").clicked() {
-                                    second_band = BandColor::Orange;
-                                    selected_second = "3".to_string();
-                                }
-                                if ui.selectable_value(&mut second_band, BandColor::Yellow, "Yellow").clicked() {
-                                    second_band = BandColor::Yellow;
-                                    selected_second = "4".to_string();
-                                }
-                                if ui.selectable_value(&mut second_band, BandColor::Green, "Green").clicked() {
-                                    second_band = BandColor::Green;
-                                    selected_second = "5".to_string();
-                                }
-                                if ui.selectable_value(&mut second_band, BandColor::Blue, "Blue").clicked() {
-                                    second_band = BandColor::Blue;
-                                    selected_second = "6".to_string();
-                                }
-                                if ui.selectable_value(&mut second_band, BandColor::Violet, "Violet").clicked() {
-                                    second_band = BandColor::Violet;
-                                    selected_second = "7".to_string();
-                                }
-                                if ui.selectable_value(&mut second_band, BandColor::Gray, "Gray").clicked() {
-                                    second_band = BandColor::Gray;
-                                    selected_second = "8".to_string();
-                                }
-                                if ui.selectable_value(&mut second_band, BandColor::White, "White").clicked() {
-                                    second_band = BandColor::White;
-                                    selected_second = "9".to_string();
-                                }
-                            });
-                        });
-                        if panel == Panel::FiveBand || panel == Panel::SixBand {
-                            ui.vertical(|ui| {
-                                ui.label("Third ring");
-                                egui::ComboBox::from_id_source("3").selected_text(format!("{:?}", third_band)).width(90.0).show_ui(ui, |ui| {
-                                    if ui.selectable_value(&mut third_band, BandColor::Black, "Black").clicked() {
-                                        third_band = BandColor::Black;
-                                        selected_third = "0".to_string();
-                                    }
-                                    if ui.selectable_value(&mut third_band, BandColor::Brown, "Brown").clicked() {
-                                        third_band = BandColor::Brown;
-                                        selected_third = "1".to_string();
-                                    }
-                                    if ui.selectable_value(&mut third_band, BandColor::Red, "Red").clicked() {
-                                        third_band = BandColor::Red;
-                                        selected_third = "2".to_string();
-                                    }
-                                    if ui.selectable_value(&mut third_band, BandColor::Orange, "Orange").clicked() {
-                                        third_band = BandColor::Orange;
-                                        selected_third = "3".to_string();
-                                    }
-                                    if ui.selectable_value(&mut third_band, BandColor::Yellow, "Yellow").clicked() {
-                                        third_band = BandColor::Yellow;
-                                        selected_third = "4".to_string();
-                                    }
-                                    if ui.selectable_value(&mut third_band, BandColor::Green, "Green").clicked() {
-                                        third_band = BandColor::Green;
-                                        selected_third = "5".to_string();
-                                    }
-                                    if ui.selectable_value(&mut third_band, BandColor::Blue, "Blue").clicked() {
-                                        third_band = BandColor::Blue;
-                                        selected_third = "6".to_string();
-                                    }
-                                    if ui.selectable_value(&mut third_band, BandColor::Violet, "Violet").clicked() {
-                                        third_band = BandColor::Violet;
-                                        selected_third = "7".to_string();
-                                    }
-                                    if ui.selectable_value(&mut third_band, BandColor::Gray, "Gray").clicked() {
-                                        third_band = BandColor::Gray;
-                                        selected_third = "8".to_string();
-                                    }
-                                    if ui.selectable_value(&mut third_band, BandColor::White, "White").clicked() {
-                                        third_band = BandColor::White;
-                                        selected_third = "9".to_string();
-                                    }
-                                });
-                            });
-                        }
-                        ui.vertical(|ui| {
-                            ui.label("Multiplier ring");
-                            egui::ComboBox::from_id_source("4").selected_text(format!("{:?}", multiplier)).width(90.0).show_ui(ui, |ui| {
-                                if ui.selectable_value(&mut multiplier, BandColor::Black, "Black").clicked() {
-                                    multiplier = BandColor::Black;
-                                    selected_multiplier = 1;
-                                }
-                                if ui.selectable_value(&mut multiplier, BandColor::Brown, "Brown").clicked() {
-                                    multiplier = BandColor::Brown;
-                                    selected_multiplier = 10;
-                                }
-                                if ui.selectable_value(&mut multiplier, BandColor::Red, "Red").clicked() {
-                                    multiplier = BandColor::Red;
-                                    selected_multiplier = 100;
-                                }
-                                if ui.selectable_value(&mut multiplier, BandColor::Orange, "Orange").clicked() {
-                                    multiplier = BandColor::Orange;
-                                    selected_multiplier = 1000;
-                                }
-                                if ui.selectable_value(&mut multiplier, BandColor::Yellow, "Yellow").clicked() {
-                                    multiplier = BandColor::Yellow;
-                                    selected_multiplier = 10000;
-                                }
-                                if ui.selectable_value(&mut multiplier, BandColor::Green, "Green").clicked() {
-                                    multiplier = BandColor::Green;
-                                    selected_multiplier = 100000;
-                                }
-                                if ui.selectable_value(&mut multiplier, BandColor::Blue, "Blue").clicked() {
-                                    multiplier = BandColor::Blue;
-                                    selected_multiplier = 1000000;
-                                }
-                                if ui.selectable_value(&mut multiplier, BandColor::Violet, "Violet").clicked() {
-                                    multiplier = BandColor::Violet;
-                                    selected_multiplier = 10000000;
-                                }
-                                if ui.selectable_value(&mut multiplier, BandColor::Gray, "Gray").clicked() {
-                                    multiplier = BandColor::Gray;
-                                    selected_multiplier = 100000000;
-                                }
-                                if ui.selectable_value(&mut multiplier, BandColor::White, "White").clicked() {
-                                    multiplier = BandColor::White;
-                                    selected_multiplier = 1000000000;
-                                }
-                            });
-                        });
-                        ui.vertical(|ui| {
-                            ui.label("Tolerance ring");
-                            egui::ComboBox::from_id_source("5").selected_text(format!("{:?}", tolerance)).width(90.0).show_ui(ui, |ui| {
-                                if ui.selectable_value(&mut tolerance, BandColor::Brown, "Brown").clicked() {
-                                    tolerance = BandColor::Brown;
-                                    selected_tolerance = "±1% (F)".to_string();
-                                }
-                                if ui.selectable_value(&mut tolerance, BandColor::Red, "Red").clicked() {
-                                    tolerance = BandColor::Red;
-                                    selected_tolerance = "±2% (G)".to_string();
-                                }
-                                if ui.selectable_value(&mut tolerance, BandColor::Orange, "Orange").clicked() {
-                                    tolerance = BandColor::Orange;
-                                    selected_tolerance = "±0.05% (W)".to_string();
-                                }
-                                if ui.selectable_value(&mut tolerance, BandColor::Yellow, "Yellow").clicked() {
-                                    tolerance = BandColor::Yellow;
-                                    selected_tolerance = "±0.02% (P)".to_string();
-                                }
-                                if ui.selectable_value(&mut tolerance, BandColor::Green, "Green").clicked() {
-                                    tolerance = BandColor::Green;
-                                    selected_tolerance = "±0.5% (D)".to_string();
-                                }
-                                if ui.selectable_value(&mut tolerance, BandColor::Blue, "Blue").clicked() {
-                                    tolerance = BandColor::Blue;
-                                    selected_tolerance = "±0.25% (C)".to_string();
-                                }
-                                if ui.selectable_value(&mut tolerance, BandColor::Violet, "Violet").clicked() {
-                                    tolerance = BandColor::Violet;
-                                    selected_tolerance = "±0.1% (B)".to_string();
-                                }
-                                if ui.selectable_value(&mut tolerance, BandColor::Gray, "Gray").clicked() {
-                                    tolerance = BandColor::Gray;
-                                    selected_tolerance = "±0.01% (L)".to_string();
-                                }
-                                if ui.selectable_value(&mut tolerance, BandColor::Gold, "Gold").clicked() {
-                                    tolerance = BandColor::Gold;
-                                    selected_tolerance = "±5% (J)".to_string();
-                                }
-                                if ui.selectable_value(&mut tolerance, BandColor::Silver, "Silver").clicked() {
-                                    tolerance = BandColor::Silver;
-                                    selected_tolerance = "±10% (K)".to_string();
-                                }
-                            });
-                        });
-                        if panel == Panel::SixBand {
-                            ui.vertical(|ui| {
-                                ui.label("Temp. coeff.");
-                                egui::ComboBox::from_id_source("6").selected_text(format!("{:?}", temp_coefficient)).width(90.0).show_ui(ui, |ui| {
-                                    if ui.selectable_value(&mut temp_coefficient, BandColor::Brown, "Brown").clicked() {
-                                        temp_coefficient = BandColor::Brown;
-                                        selected_temp_coefficient = "100 ppm/ºC".to_string();
-                                    }
-                                    if ui.selectable_value(&mut temp_coefficient, BandColor::Red, "Red").clicked() {
-                                        temp_coefficient = BandColor::Red;
-                                        selected_temp_coefficient = "50 ppm/ºC".to_string();
-                                    }
-                                    if ui.selectable_value(&mut temp_coefficient, BandColor::Orange, "Orange").clicked() {
-                                        temp_coefficient = BandColor::Orange;
-                                        selected_temp_coefficient = "15 ppm/ºC".to_string();
-                                    }
-                                    if ui.selectable_value(&mut temp_coefficient, BandColor::Yellow, "Yellow").clicked() {
-                                        temp_coefficient = BandColor::Yellow;
-                                        selected_temp_coefficient = "25 ppm/ºC".to_string();
-                                    }
-                                    if ui.selectable_value(&mut temp_coefficient, BandColor::Blue, "Blue").clicked() {
-                                        temp_coefficient = BandColor::Blue;
-                                        selected_temp_coefficient = "10 ppm/ºC".to_string();
-                                    }
-                                    if ui.selectable_value(&mut temp_coefficient, BandColor::Violet, "Violet").clicked() {
-                                        temp_coefficient = BandColor::Violet;
-                                        selected_temp_coefficient = "5 ppm/ºC".to_string();
-                                    }
-                                    if ui.selectable_value(&mut temp_coefficient, BandColor::White, "White").clicked() {
-                                        temp_coefficient = BandColor::White;
-                                        selected_temp_coefficient = "1 ppm/ºC".to_string();
-                                    }
-                                });
-                            });
-                        }
-                    });
-                    ui.separator();
+fn default_panel() -> Panel {
+    Panel::FiveBand
+}
+fn default_first() -> BandColor {
+    BandColor::Brown
+}
+fn default_zero() -> BandColor {
+    BandColor::Black
+}
+fn default_tolerance() -> BandColor {
+    BandColor::Brown
+}
 
-                    match panel {
-                        Panel::FourBand => {
-                            string_result.push_str(&selected_first);
-                            string_result.push_str(&selected_second);
-                        },
-                        Panel::FiveBand => {
-                            string_result.push_str(&selected_first);
-                            string_result.push_str(&selected_second);
-                            string_result.push_str(&selected_third);
-                        },
-                        Panel::SixBand => {
-                            string_result.push_str(&selected_first);
-                            string_result.push_str(&selected_second);
-                            string_result.push_str(&selected_third);
-                        },
-                        Panel::About => {},
-                    }
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            window_pos: None,
+            panel: default_panel(),
+            first_band: default_first(),
+            second_band: default_zero(),
+            third_band: default_zero(),
+            multiplier: default_zero(),
+            tolerance: default_tolerance(),
+            temp_coefficient: default_tolerance(),
+        }
+    }
+}
 
-                    int_result = string_result.parse::<f64>().unwrap() * selected_multiplier as f64;
+impl Config {
+    fn path() -> PathBuf {
+        dirs::config_dir()
+            .unwrap_or_else(|| PathBuf::from("."))
+            .join("resistor")
+            .join("config.json")
+    }
 
-                    if int_result >= 1000000000.0 {
-                        int_result = int_result / 1000000000.0;
-                        string_multiplier = "GΩ".to_string();
-                    } else if int_result >= 1000000.0 {
-                        int_result = int_result / 1000000.0;
-                        string_multiplier = "MΩ".to_string();
-                    } else if int_result >= 1000.0 {
-                        int_result = int_result / 1000.0;
-                        string_multiplier = "kΩ".to_string();
-                    } else if int_result >= 1.0 {
-                        int_result = int_result / 1.0;
-                        string_multiplier = "Ω".to_string();
-                    }
+    fn load() -> Self {
+        std::fs::read_to_string(Self::path())
+            .ok()
+            .and_then(|s| serde_json::from_str(&s).ok())
+            .unwrap_or_default()
+    }
 
-                    ui.centered_and_justified(|ui| {
-                        if panel == Panel::SixBand {
-                            ui.label(egui::RichText::new(format!("{} {} {} {}", int_result.to_string(), string_multiplier, selected_tolerance, selected_temp_coefficient)).font(egui::FontId::proportional(40.0)).color(egui::Color32::WHITE));
-                        } else {
-                            ui.label(egui::RichText::new(format!("{} {} {}", int_result.to_string(), string_multiplier, selected_tolerance)).font(egui::FontId::proportional(40.0)).color(egui::Color32::WHITE));
-                        }
-                    });
+    fn save(&self) {
+        let path = Self::path();
+        if let Some(parent) = path.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        if let Ok(json) = serde_json::to_string_pretty(self) {
+            let _ = std::fs::write(path, json);
+        }
+    }
+}
 
-                    ui.add_space(-25.0);
-                    ui.separator();
-                    ui.hyperlink("https://en.wikipedia.org/wiki/Resistor#Resistor_marking");
+// ---------------------------------------------------------------------------
+// App
+// ---------------------------------------------------------------------------
 
-                    string_result.clear();
-                } else {
-                    ui.add_space(20.0);
-                    ui.centered_and_justified(|ui| {
-                        ui.label(egui::RichText::new("by   -=De/\\/=-   2023y.").font(egui::FontId::proportional(20.0)).color(egui::Color32::GREEN));
-                    });
+struct ResistorApp {
+    panel: Panel,
+    first_band: BandColor,
+    second_band: BandColor,
+    third_band: BandColor,
+    multiplier: BandColor,
+    tolerance: BandColor,
+    temp_coefficient: BandColor,
+    window_pos: Option<[f32; 2]>,
+}
+
+impl ResistorApp {
+    fn from_config(cfg: &Config) -> Self {
+        Self {
+            panel: cfg.panel,
+            first_band: cfg.first_band,
+            second_band: cfg.second_band,
+            third_band: cfg.third_band,
+            multiplier: cfg.multiplier,
+            tolerance: cfg.tolerance,
+            temp_coefficient: cfg.temp_coefficient,
+            window_pos: cfg.window_pos,
+        }
+    }
+
+    fn save_config(&self) {
+        Config {
+            window_pos: self.window_pos,
+            panel: self.panel,
+            first_band: self.first_band,
+            second_band: self.second_band,
+            third_band: self.third_band,
+            multiplier: self.multiplier,
+            tolerance: self.tolerance,
+            temp_coefficient: self.temp_coefficient,
+        }
+        .save();
+    }
+
+    fn resistance(&self) -> f64 {
+        let base = match self.panel {
+            Panel::FourBand => {
+                self.first_band.digit() as f64 * 10.0 + self.second_band.digit() as f64
+            }
+            Panel::FiveBand | Panel::SixBand => {
+                self.first_band.digit() as f64 * 100.0
+                    + self.second_band.digit() as f64 * 10.0
+                    + self.third_band.digit() as f64
+            }
+            Panel::About => 0.0,
+        };
+        base * self.multiplier.multiplier()
+    }
+
+    fn format_resistance(&self) -> String {
+        let ohms = self.resistance();
+        let (val, unit) = if ohms >= 1_000_000_000.0 {
+            (ohms / 1_000_000_000.0, "GΩ")
+        } else if ohms >= 1_000_000.0 {
+            (ohms / 1_000_000.0, "MΩ")
+        } else if ohms >= 1_000.0 {
+            (ohms / 1_000.0, "kΩ")
+        } else {
+            (ohms, "Ω")
+        };
+
+        let formatted = if val == val.floor() {
+            format!("{}", val as i64)
+        } else {
+            format!("{val}")
+        };
+
+        let tol = self.tolerance.tolerance();
+        if self.panel == Panel::SixBand {
+            format!(
+                "{formatted} {unit}  {tol}  {}",
+                self.temp_coefficient.temp_coefficient()
+            )
+        } else {
+            format!("{formatted} {unit}  {tol}")
+        }
+    }
+
+    fn band_colors(&self) -> Vec<Color32> {
+        match self.panel {
+            Panel::FourBand => vec![
+                self.first_band.color32(),
+                self.second_band.color32(),
+                self.multiplier.color32(),
+                self.tolerance.color32(),
+            ],
+            Panel::FiveBand => vec![
+                self.first_band.color32(),
+                self.second_band.color32(),
+                self.third_band.color32(),
+                self.multiplier.color32(),
+                self.tolerance.color32(),
+            ],
+            Panel::SixBand => vec![
+                self.first_band.color32(),
+                self.second_band.color32(),
+                self.third_band.color32(),
+                self.multiplier.color32(),
+                self.tolerance.color32(),
+                self.temp_coefficient.color32(),
+            ],
+            Panel::About => vec![],
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Drawing helpers
+// ---------------------------------------------------------------------------
+
+fn draw_resistor(ui: &mut egui::Ui, app: &ResistorApp) {
+    let width = ui.available_width();
+    let height = 90.0;
+    let (rect, _) = ui.allocate_exact_size(Vec2::new(width, height), egui::Sense::hover());
+    let painter = ui.painter_at(rect);
+
+    let cx = rect.center().x;
+    let cy = rect.center().y;
+    let body_w = 230.0;
+    let body_h = 50.0;
+    let bulge_r = 30.0;
+    let lead_w = 80.0;
+    let lead_h = 8.0;
+    let lead_color = Color32::from_rgb(160, 160, 160);
+    let body_color = Color32::from_rgb(200, 170, 130);
+
+    let left_cap = cx - body_w / 2.0;
+    let right_cap = cx + body_w / 2.0;
+
+    // Leads
+    painter.rect_filled(
+        Rect::from_min_size(
+            Pos2::new(left_cap - lead_w, cy - lead_h / 2.0),
+            Vec2::new(lead_w, lead_h),
+        ),
+        CornerRadius::ZERO,
+        lead_color,
+    );
+    painter.rect_filled(
+        Rect::from_min_size(
+            Pos2::new(right_cap, cy - lead_h / 2.0),
+            Vec2::new(lead_w, lead_h),
+        ),
+        CornerRadius::ZERO,
+        lead_color,
+    );
+
+    // End-cap bulges
+    painter.circle_filled(Pos2::new(left_cap, cy), bulge_r, body_color);
+    painter.circle_filled(Pos2::new(right_cap, cy), bulge_r, body_color);
+
+    // Main body
+    painter.rect_filled(
+        Rect::from_center_size(Pos2::new(cx, cy), Vec2::new(body_w, body_h)),
+        CornerRadius::ZERO,
+        body_color,
+    );
+
+    // Color bands
+    let bands = app.band_colors();
+    if bands.is_empty() {
+        return;
+    }
+    let n = bands.len() as f32;
+    let band_h = bulge_r * 2.0;
+
+    // First band on the left bulge, last band (6-band mode) on the right bulge,
+    // remaining bands evenly spaced on the body
+    let first_x = left_cap;
+    let last_on_bulge = app.panel == Panel::SixBand;
+    let last_x = right_cap;
+
+    let inner_bands = if last_on_bulge { &bands[1..n as usize - 1] } else { &bands[1..] };
+    let inner_n = inner_bands.len() as f32;
+    let zone = body_w * 0.70;
+    let spacing = zone / (inner_n + 1.0);
+    let start_x = cx - zone / 2.0;
+
+    // First band (on left bulge)
+    painter.rect_filled(
+        Rect::from_center_size(Pos2::new(first_x, cy), Vec2::new(7.0, band_h)),
+        CornerRadius::ZERO,
+        bands[0],
+    );
+
+    // Inner bands (on body)
+    for (i, color) in inner_bands.iter().enumerate() {
+        let x = start_x + spacing * (i as f32 + 1.0);
+        painter.rect_filled(
+            Rect::from_center_size(Pos2::new(x, cy), Vec2::new(7.0, body_h)),
+            CornerRadius::ZERO,
+            *color,
+        );
+    }
+
+    // Last band on right bulge (6-band only)
+    if last_on_bulge {
+        painter.rect_filled(
+            Rect::from_center_size(Pos2::new(last_x, cy), Vec2::new(7.0, band_h)),
+            CornerRadius::ZERO,
+            *bands.last().unwrap(),
+        );
+    }
+}
+
+fn band_combo(
+    ui: &mut egui::Ui,
+    id: &str,
+    label: &str,
+    selected: &mut BandColor,
+    options: &[BandColor],
+) {
+    ui.vertical(|ui| {
+        ui.label(label);
+        egui::ComboBox::from_id_salt(id)
+            .selected_text(format!("{selected}"))
+            .width(90.0)
+            .show_ui(ui, |ui| {
+                for &color in options {
+                    ui.selectable_value(selected, color, format!("{color}"));
                 }
             });
-        });
+    });
+}
 
-        egui_macroquad::draw();
+// ---------------------------------------------------------------------------
+// eframe::App
+// ---------------------------------------------------------------------------
 
-        if panel != Panel::About {
-            draw_resistor_body();
-            
-            match selected_first.as_str() {
-                "1" => {draw_rectangle(187.0, 48.0, 6.0, 80.0, DARKBROWN)}
-                "2" => {draw_rectangle(187.0, 48.0, 6.0, 80.0, RED)}
-                "3" => {draw_rectangle(187.0, 48.0, 6.0, 80.0, ORANGE)}
-                "4" => {draw_rectangle(187.0, 48.0, 6.0, 80.0, YELLOW)}
-                "5" => {draw_rectangle(187.0, 48.0, 6.0, 80.0, GREEN)}
-                "6" => {draw_rectangle(187.0, 48.0, 6.0, 80.0, BLUE)}
-                "7" => {draw_rectangle(187.0, 48.0, 6.0, 80.0, VIOLET)}
-                "8" => {draw_rectangle(187.0, 48.0, 6.0, 80.0, GRAY)}
-                _ => {draw_rectangle(187.0, 48.0, 6.0, 80.0, WHITE)}
-            }
-
-            match selected_second.as_str() {
-                "0" => {draw_rectangle(220.0, 53.0, 6.0, 69.0, BLACK)}
-                "1" => {draw_rectangle(220.0, 53.0, 6.0, 69.0, DARKBROWN)}
-                "2" => {draw_rectangle(220.0, 53.0, 6.0, 69.0, RED)}
-                "3" => {draw_rectangle(220.0, 53.0, 6.0, 69.0, ORANGE)}
-                "4" => {draw_rectangle(220.0, 53.0, 6.0, 69.0, YELLOW)}
-                "5" => {draw_rectangle(220.0, 53.0, 6.0, 69.0, GREEN)}
-                "6" => {draw_rectangle(220.0, 53.0, 6.0, 69.0, BLUE)}
-                "7" => {draw_rectangle(220.0, 53.0, 6.0, 69.0, VIOLET)}
-                "8" => {draw_rectangle(220.0, 53.0, 6.0, 69.0, GRAY)}
-                _ => {draw_rectangle(220.0, 53.0, 6.0, 69.0, WHITE)}
-            }
-
-            if panel == Panel::FiveBand || panel == Panel::SixBand {
-                match selected_third.as_str() {
-                    "0" => {draw_rectangle(250.0, 53.0, 6.0, 69.0, BLACK)}
-                    "1" => {draw_rectangle(250.0, 53.0, 6.0, 69.0, DARKBROWN)}
-                    "2" => {draw_rectangle(250.0, 53.0, 6.0, 69.0, RED)}
-                    "3" => {draw_rectangle(250.0, 53.0, 6.0, 69.0, ORANGE)}
-                    "4" => {draw_rectangle(250.0, 53.0, 6.0, 69.0, YELLOW)}
-                    "5" => {draw_rectangle(250.0, 53.0, 6.0, 69.0, GREEN)}
-                    "6" => {draw_rectangle(250.0, 53.0, 6.0, 69.0, BLUE)}
-                    "7" => {draw_rectangle(250.0, 53.0, 6.0, 69.0, VIOLET)}
-                    "8" => {draw_rectangle(250.0, 53.0, 6.0, 69.0, GRAY)}
-                    "9" => {draw_rectangle(250.0, 53.0, 6.0, 69.0, WHITE)}
-                    _ => {}
-                }
-                multiplier_pos_x = 280.0;
-                tolerance_pos_x = 310.0;
-            } else {
-                multiplier_pos_x = 250.0;
-                tolerance_pos_x = 280.0;
-            }
-
-            match multiplier {
-                BandColor::Black => {draw_rectangle(multiplier_pos_x, 53.0, 6.0, 69.0, BLACK)},
-                BandColor::Brown => {draw_rectangle(multiplier_pos_x, 53.0, 6.0, 69.0, DARKBROWN)}
-                BandColor::Red => {draw_rectangle(multiplier_pos_x, 53.0, 6.0, 69.0, RED)}
-                BandColor::Orange => {draw_rectangle(multiplier_pos_x, 53.0, 6.0, 69.0, ORANGE)}
-                BandColor::Yellow => {draw_rectangle(multiplier_pos_x, 53.0, 6.0, 69.0, YELLOW)}
-                BandColor::Green => {draw_rectangle(multiplier_pos_x, 53.0, 6.0, 69.0, GREEN)}
-                BandColor::Blue => {draw_rectangle(multiplier_pos_x, 53.0, 6.0, 69.0, BLUE)}
-                BandColor::Violet => {draw_rectangle(multiplier_pos_x, 53.0, 6.0, 69.0, VIOLET)}
-                BandColor::Gray => {draw_rectangle(multiplier_pos_x, 53.0, 6.0, 69.0, GRAY)}
-                BandColor::White => {draw_rectangle(multiplier_pos_x, 53.0, 6.0, 69.0, WHITE)}
-                BandColor::Gold => {draw_rectangle(multiplier_pos_x, 53.0, 6.0, 69.0, GOLD)}
-                BandColor::Silver => {draw_rectangle(multiplier_pos_x, 53.0, 6.0, 69.0, LIGHTGRAY)}
-            }
-
-            match tolerance {
-                BandColor::Black => {draw_rectangle(tolerance_pos_x, 53.0, 6.0, 69.0, BLACK)},
-                BandColor::Brown => {draw_rectangle(tolerance_pos_x, 53.0, 6.0, 69.0, DARKBROWN)}
-                BandColor::Red => {draw_rectangle(tolerance_pos_x, 53.0, 6.0, 69.0, RED)}
-                BandColor::Orange => {draw_rectangle(tolerance_pos_x, 53.0, 6.0, 69.0, ORANGE)}
-                BandColor::Yellow => {draw_rectangle(tolerance_pos_x, 53.0, 6.0, 69.0, YELLOW)}
-                BandColor::Green => {draw_rectangle(tolerance_pos_x, 53.0, 6.0, 69.0, GREEN)}
-                BandColor::Blue => {draw_rectangle(tolerance_pos_x, 53.0, 6.0, 69.0, BLUE)}
-                BandColor::Violet => {draw_rectangle(tolerance_pos_x, 53.0, 6.0, 69.0, VIOLET)}
-                BandColor::Gray => {draw_rectangle(tolerance_pos_x, 53.0, 6.0, 69.0, GRAY)}
-                BandColor::White => {draw_rectangle(tolerance_pos_x, 53.0, 6.0, 69.0, WHITE)}
-                BandColor::Gold => {draw_rectangle(tolerance_pos_x, 53.0, 6.0, 69.0, GOLD)}
-                BandColor::Silver => {draw_rectangle(tolerance_pos_x, 53.0, 6.0, 69.0, LIGHTGRAY)}
-            }
-
-            if panel == Panel::SixBand {
-                match temp_coefficient {
-                    BandColor::Black => {draw_rectangle(387.0, 48.0, 6.0, 80.0, BLACK)},
-                    BandColor::Brown => {draw_rectangle(387.0, 48.0, 6.0, 80.0, DARKBROWN)}
-                    BandColor::Red => {draw_rectangle(387.0, 48.0, 6.0, 80.0, RED)}
-                    BandColor::Orange => {draw_rectangle(387.0, 48.0, 6.0, 80.0, ORANGE)}
-                    BandColor::Yellow => {draw_rectangle(387.0, 48.0, 6.0, 80.0, YELLOW)}
-                    BandColor::Green => {draw_rectangle(387.0, 48.0, 6.0, 80.0, GREEN)}
-                    BandColor::Blue => {draw_rectangle(387.0, 48.0, 6.0, 80.0, BLUE)}
-                    BandColor::Violet => {draw_rectangle(387.0, 48.0, 6.0, 80.0, VIOLET)}
-                    BandColor::Gray => {draw_rectangle(387.0, 48.0, 6.0, 80.0, GRAY)}
-                    BandColor::White => {draw_rectangle(387.0, 48.0, 6.0, 80.0, WHITE)}
-                    BandColor::Gold => {draw_rectangle(387.0, 48.0, 6.0, 80.0, GOLD)}
-                    BandColor::Silver => {draw_rectangle(387.0, 48.0, 6.0, 80.0, LIGHTGRAY)}
-                }
-            }
+impl eframe::App for ResistorApp {
+    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        if let Some(outer) = ui.ctx().input(|i| i.viewport().outer_rect) {
+            self.window_pos = Some([outer.min.x, outer.min.y]);
         }
 
-        next_frame().await
+        ui.horizontal(|ui| {
+            ui.selectable_value(&mut self.panel, Panel::FourBand, "4-Bands");
+            ui.selectable_value(&mut self.panel, Panel::FiveBand, "5-Bands");
+            ui.selectable_value(&mut self.panel, Panel::SixBand, "6-Bands");
+            ui.selectable_value(&mut self.panel, Panel::About, "About");
+        });
+
+        if self.panel == Panel::About {
+            ui.add_space(40.0);
+            ui.centered_and_justified(|ui| {
+                ui.label(
+                    egui::RichText::new("by   -=De/\\/=-   2023y.")
+                        .size(20.0)
+                        .color(Color32::from_rgb(0, 200, 0)),
+                );
+            });
+            return;
+        }
+
+        ui.add_space(4.0);
+        draw_resistor(ui, self);
+        ui.add_space(4.0);
+        ui.separator();
+
+        ui.horizontal(|ui| {
+            band_combo(
+                ui,
+                "first",
+                "1st band",
+                &mut self.first_band,
+                BandColor::FIRST_DIGIT,
+            );
+            band_combo(
+                ui,
+                "second",
+                "2nd band",
+                &mut self.second_band,
+                BandColor::DIGIT,
+            );
+            if self.panel == Panel::FiveBand || self.panel == Panel::SixBand {
+                band_combo(
+                    ui,
+                    "third",
+                    "3rd band",
+                    &mut self.third_band,
+                    BandColor::DIGIT,
+                );
+            }
+            band_combo(
+                ui,
+                "multiplier",
+                "Multiplier",
+                &mut self.multiplier,
+                BandColor::MULTIPLIER,
+            );
+            band_combo(
+                ui,
+                "tolerance",
+                "Tolerance",
+                &mut self.tolerance,
+                BandColor::TOLERANCE,
+            );
+            if self.panel == Panel::SixBand {
+                band_combo(
+                    ui,
+                    "temp",
+                    "Temp. coeff.",
+                    &mut self.temp_coefficient,
+                    BandColor::TEMP_COEFFICIENT,
+                );
+            }
+        });
+
+        ui.separator();
+
+        ui.vertical_centered(|ui| {
+            ui.add_space(10.0);
+            ui.label(
+                egui::RichText::new(self.format_resistance())
+                    .size(34.0)
+                    .color(Color32::WHITE),
+            );
+            ui.add_space(10.0);
+        });
+
+        ui.separator();
+        ui.hyperlink("https://en.wikipedia.org/wiki/Resistor#Resistor_marking");
     }
+
+    fn on_exit(&mut self) {
+        self.save_config();
+    }
+}
+
+impl Drop for ResistorApp {
+    fn drop(&mut self) {
+        self.save_config();
+    }
+}
+
+// ---------------------------------------------------------------------------
+// main
+// ---------------------------------------------------------------------------
+
+fn main() -> eframe::Result<()> {
+    let config = Config::load();
+
+    let mut viewport = egui::ViewportBuilder::default()
+        .with_inner_size([600.0, 400.0])
+        .with_resizable(false)
+        .with_title(format!("Resistor v{}", env!("CARGO_PKG_VERSION")));
+
+    if let Some([x, y]) = config.window_pos {
+        viewport = viewport.with_position([x, y]);
+    }
+
+    let options = eframe::NativeOptions {
+        viewport,
+        ..Default::default()
+    };
+
+    eframe::run_native(
+        "Resistor",
+        options,
+        Box::new(|_cc| Ok(Box::new(ResistorApp::from_config(&config)))),
+    )
 }

@@ -1,16 +1,16 @@
+
 [package]
 name = "resistor"
-version = "0.1.3"
-edition = "2021"
+version = "0.3.0"
+edition = "2024"
 authors = ["Denis Salmanovich"]
 readme = "README.md"
-description = "Resistor color code calculator written in Rust using egui and macroquad libraries."
+description = "Resistor color code calculator written in Rust using eframe/egui."
 repository = "https://github.com/denix666/resistor"
-ducumentation = "https://github.com/denix666/resistor/blob/main/README.md"
 license-file = "LICENSE"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
-egui-macroquad = "0.15.0"
-macroquad = "0.3.26"
+eframe = "0.36"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+dirs = "6"
