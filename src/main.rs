@@ -42,6 +42,22 @@ impl BandColor {
         }
     }
 
+    fn from_digit(d: u8) -> Option<Self> {
+        match d {
+            0 => Some(Self::Black),
+            1 => Some(Self::Brown),
+            2 => Some(Self::Red),
+            3 => Some(Self::Orange),
+            4 => Some(Self::Yellow),
+            5 => Some(Self::Green),
+            6 => Some(Self::Blue),
+            7 => Some(Self::Violet),
+            8 => Some(Self::Gray),
+            9 => Some(Self::White),
+            _ => None,
+        }
+    }
+
     fn multiplier(self) -> f64 {
         match self {
             Self::Black => 1.0,
@@ -56,6 +72,24 @@ impl BandColor {
             Self::White => 1_000_000_000.0,
             Self::Gold => 0.1,
             Self::Silver => 0.01,
+        }
+    }
+
+    fn from_multiplier_exp(exp: i32) -> Option<Self> {
+        match exp {
+            -2 => Some(Self::Silver),
+            -1 => Some(Self::Gold),
+            0 => Some(Self::Black),
+            1 => Some(Self::Brown),
+            2 => Some(Self::Red),
+            3 => Some(Self::Orange),
+            4 => Some(Self::Yellow),
+            5 => Some(Self::Green),
+            6 => Some(Self::Blue),
+            7 => Some(Self::Violet),
+            8 => Some(Self::Gray),
+            9 => Some(Self::White),
+            _ => None,
         }
     }
 
@@ -188,6 +222,52 @@ enum Panel {
 }
 
 // ---------------------------------------------------------------------------
+// ResistorUnit
+// ---------------------------------------------------------------------------
+
+#[derive(Clone, Copy, PartialEq)]
+enum ResistorUnit {
+    Ohm,
+    KiloOhm,
+    MegaOhm,
+    GigaOhm,
+}
+
+impl ResistorUnit {
+    const ALL: &[Self] = &[Self::Ohm, Self::KiloOhm, Self::MegaOhm, Self::GigaOhm];
+
+    fn factor(self) -> f64 {
+        match self {
+            Self::Ohm => 1.0,
+            Self::KiloOhm => 1_000.0,
+            Self::MegaOhm => 1_000_000.0,
+            Self::GigaOhm => 1_000_000_000.0,
+        }
+    }
+
+    fn label(self) -> &'static str {
+        match self {
+            Self::Ohm => "Ω",
+            Self::KiloOhm => "kΩ",
+            Self::MegaOhm => "MΩ",
+            Self::GigaOhm => "GΩ",
+        }
+    }
+
+    fn from_ohms(ohms: f64) -> (f64, Self) {
+        if ohms >= 1_000_000_000.0 {
+            (ohms / 1_000_000_000.0, Self::GigaOhm)
+        } else if ohms >= 1_000_000.0 {
+            (ohms / 1_000_000.0, Self::MegaOhm)
+        } else if ohms >= 1_000.0 {
+            (ohms / 1_000.0, Self::KiloOhm)
+        } else {
+            (ohms, Self::Ohm)
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Config (persisted to JSON)
 // ---------------------------------------------------------------------------
 
@@ -199,9 +279,9 @@ struct Config {
     panel: Panel,
     #[serde(default = "default_first")]
     first_band: BandColor,
-    #[serde(default = "default_zero")]
+    #[serde(default = "default_second")]
     second_band: BandColor,
-    #[serde(default = "default_zero")]
+    #[serde(default = "default_third")]
     third_band: BandColor,
     #[serde(default = "default_zero")]
     multiplier: BandColor,
@@ -212,16 +292,22 @@ struct Config {
 }
 
 fn default_panel() -> Panel {
-    Panel::FiveBand
+    Panel::FourBand
 }
 fn default_first() -> BandColor {
     BandColor::Brown
 }
-fn default_zero() -> BandColor {
+fn default_second() -> BandColor {
     BandColor::Black
 }
-fn default_tolerance() -> BandColor {
+fn default_third() -> BandColor {
     BandColor::Brown
+}
+fn default_zero() -> BandColor {
+    BandColor::Brown
+}
+fn default_tolerance() -> BandColor {
+    BandColor::Gold
 }
 
 impl Default for Config {
@@ -230,8 +316,8 @@ impl Default for Config {
             window_pos: None,
             panel: default_panel(),
             first_band: default_first(),
-            second_band: default_zero(),
-            third_band: default_zero(),
+            second_band: default_second(),
+            third_band: default_third(),
             multiplier: default_zero(),
             tolerance: default_tolerance(),
             temp_coefficient: default_tolerance(),
@@ -278,11 +364,13 @@ struct ResistorApp {
     tolerance: BandColor,
     temp_coefficient: BandColor,
     window_pos: Option<[f32; 2]>,
+    ohms_text: String,
+    unit: ResistorUnit,
 }
 
 impl ResistorApp {
     fn from_config(cfg: &Config) -> Self {
-        Self {
+        let mut app = Self {
             panel: cfg.panel,
             first_band: cfg.first_band,
             second_band: cfg.second_band,
@@ -291,7 +379,11 @@ impl ResistorApp {
             tolerance: cfg.tolerance,
             temp_coefficient: cfg.temp_coefficient,
             window_pos: cfg.window_pos,
-        }
+            ohms_text: String::new(),
+            unit: ResistorUnit::Ohm,
+        };
+        app.sync_display_from_bands();
+        app
     }
 
     fn save_config(&self) {
@@ -323,32 +415,63 @@ impl ResistorApp {
         base * self.multiplier.multiplier()
     }
 
-    fn format_resistance(&self) -> String {
+    fn sync_display_from_bands(&mut self) {
         let ohms = self.resistance();
-        let (val, unit) = if ohms >= 1_000_000_000.0 {
-            (ohms / 1_000_000_000.0, "GΩ")
-        } else if ohms >= 1_000_000.0 {
-            (ohms / 1_000_000.0, "MΩ")
-        } else if ohms >= 1_000.0 {
-            (ohms / 1_000.0, "kΩ")
-        } else {
-            (ohms, "Ω")
-        };
-
-        let formatted = if val == val.floor() {
+        let (val, unit) = ResistorUnit::from_ohms(ohms);
+        self.unit = unit;
+        self.ohms_text = if val == val.floor() {
             format!("{}", val as i64)
         } else {
             format!("{val}")
         };
+    }
 
-        let tol = self.tolerance.tolerance();
-        if self.panel == Panel::SixBand {
-            format!(
-                "{formatted} {unit}  {tol}  {}",
-                self.temp_coefficient.temp_coefficient()
-            )
-        } else {
-            format!("{formatted} {unit}  {tol}")
+    fn update_bands_from_ohms(&mut self, ohms: f64) {
+        if ohms <= 0.0 {
+            return;
+        }
+
+        let num_digits: u32 = match self.panel {
+            Panel::FourBand => 2,
+            Panel::FiveBand | Panel::SixBand => 3,
+            Panel::About => return,
+        };
+
+        let min_sig = 10u32.pow(num_digits - 1);
+        let max_sig = 10u32.pow(num_digits) - 1;
+
+        let log = ohms.log10();
+        let exp = (log.floor() as i32) - (num_digits as i32 - 1);
+        let exp = exp.clamp(-2, 9);
+
+        let sig = (ohms / 10f64.powi(exp)).round() as u32;
+        let sig = sig.clamp(min_sig, max_sig);
+
+        if let Some(mult) = BandColor::from_multiplier_exp(exp) {
+            self.multiplier = mult;
+        }
+
+        match self.panel {
+            Panel::FourBand => {
+                if let Some(c) = BandColor::from_digit((sig / 10) as u8) {
+                    self.first_band = c;
+                }
+                if let Some(c) = BandColor::from_digit((sig % 10) as u8) {
+                    self.second_band = c;
+                }
+            }
+            Panel::FiveBand | Panel::SixBand => {
+                if let Some(c) = BandColor::from_digit((sig / 100) as u8) {
+                    self.first_band = c;
+                }
+                if let Some(c) = BandColor::from_digit(((sig / 10) % 10) as u8) {
+                    self.second_band = c;
+                }
+                if let Some(c) = BandColor::from_digit((sig % 10) as u8) {
+                    self.third_band = c;
+                }
+            }
+            Panel::About => {}
         }
     }
 
@@ -392,7 +515,7 @@ fn draw_resistor(ui: &mut egui::Ui, app: &ResistorApp) {
 
     let cx = rect.center().x;
     let cy = rect.center().y;
-    let body_w = 230.0;
+    let body_w = 130.0;
     let body_h = 50.0;
     let bulge_r = 30.0;
     let lead_w = 80.0;
@@ -440,13 +563,15 @@ fn draw_resistor(ui: &mut egui::Ui, app: &ResistorApp) {
     let n = bands.len() as f32;
     let band_h = bulge_r * 2.0;
 
-    // First band on the left bulge, last band (6-band mode) on the right bulge,
-    // remaining bands evenly spaced on the body
     let first_x = left_cap;
     let last_on_bulge = app.panel == Panel::SixBand;
     let last_x = right_cap;
 
-    let inner_bands = if last_on_bulge { &bands[1..n as usize - 1] } else { &bands[1..] };
+    let inner_bands = if last_on_bulge {
+        &bands[1..n as usize - 1]
+    } else {
+        &bands[1..]
+    };
     let inner_n = inner_bands.len() as f32;
     let zone = body_w * 0.70;
     let spacing = zone / (inner_n + 1.0);
@@ -584,16 +709,67 @@ impl eframe::App for ResistorApp {
 
         ui.separator();
 
+        // Editable resistance value
         ui.vertical_centered(|ui| {
-            ui.add_space(10.0);
-            ui.label(
-                egui::RichText::new(self.format_resistance())
-                    .size(34.0)
-                    .color(Color32::WHITE),
-            );
-            ui.add_space(10.0);
+            ui.add_space(8.0);
+            ui.horizontal(|ui| {
+                let avail = ui.available_width();
+                let content_w = 350.0;
+                if avail > content_w {
+                    ui.add_space((avail - content_w) / 2.0);
+                }
+
+                let resp = ui.add(
+                    egui::TextEdit::singleline(&mut self.ohms_text)
+                        .font(egui::FontId::proportional(30.0))
+                        .desired_width(100.0)
+                        .horizontal_align(egui::Align::RIGHT),
+                );
+
+                let prev_unit = self.unit;
+                egui::ComboBox::from_id_salt("unit")
+                    .selected_text(egui::RichText::new(self.unit.label()).size(22.0))
+                    .width(70.0)
+                    .show_ui(ui, |ui| {
+                        for &u in ResistorUnit::ALL {
+                            ui.selectable_value(&mut self.unit, u, u.label());
+                        }
+                    });
+                let unit_changed = self.unit != prev_unit;
+
+                ui.add_space(10.0);
+                ui.label(
+                    egui::RichText::new(self.tolerance.tolerance())
+                        .size(20.0)
+                        .color(Color32::WHITE),
+                );
+                if self.panel == Panel::SixBand {
+                    ui.add_space(4.0);
+                    ui.label(
+                        egui::RichText::new(self.temp_coefficient.temp_coefficient())
+                            .size(20.0)
+                            .color(Color32::WHITE),
+                    );
+                }
+
+                if resp.changed() || unit_changed {
+                    if let Ok(val) = self.ohms_text.parse::<f64>() {
+                        self.update_bands_from_ohms(val * self.unit.factor());
+                    }
+                }
+
+                if !resp.has_focus() && !unit_changed {
+                    self.sync_display_from_bands();
+                }
+            });
+            ui.add_space(8.0);
         });
 
+        // Footer pinned to bottom
+        let remaining = ui.available_height() - 30.0;
+        if remaining > 0.0 {
+            ui.add_space(remaining);
+        }
         ui.separator();
         ui.hyperlink("https://en.wikipedia.org/wiki/Resistor#Resistor_marking");
     }
